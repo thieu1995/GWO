@@ -40,7 +40,6 @@ An advanced grey wolf optimization algorithm and its application to planning pro
 A better exploration strategy in Grey Wolf Optimizer
 R-GWO: Representative-based grey wolf optimizer for solving engineering problems
 An improved grey wolf optimizer algorithm integrated with Cuckoo Search
-Accelerated grey wolf optimization for global optimization problems
 Effects of dominant wolves in grey wolf optimization algorithm
 Opposition-based learning grey wolf optimizer for global optimization
 Improved dynamic grey wolf optimizer

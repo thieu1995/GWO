@@ -6,7 +6,7 @@
 
 import numpy as np
 from mealpy import Problem, FloatVar
-from GWO import ChaoticGWO, FuzzyGWO, IncrementalGWO, ExGWO, DS_GWO
+from GWO import ChaoticGWO, FuzzyGWO, IncrementalGWO, ExGWO, DS_GWO, IOBL_GWO
 
 
 def sphere_function(x):
@@ -32,5 +32,9 @@ prob = {
 # model = ExGWO(epoch=100, pop_size=20)
 # model.solve(problem=prob, mode="swarm")
 
-model = DS_GWO(epoch=100, pop_size=20, explore_ratio=0.4, n_groups=6)
-model.solve(problem=prob, mode="swarm")
+# model = DS_GWO(epoch=100, pop_size=20, explore_ratio=0.4, n_groups=6)
+# model.solve(problem=prob, mode="swarm")
+
+model = IOBL_GWO(epoch=100, pop_size=20)
+model.solve(problem=prob)
+
