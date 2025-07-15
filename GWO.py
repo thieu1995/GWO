@@ -490,19 +490,82 @@ class DS_GWO(Optimizer):
     """
 
     def __init__(self, epoch: int = 10000, pop_size: int = 100,
-                 explore_ratio: float = 0.4, **kwargs: object) -> None:
+                 explore_ratio: float = 0.4, n_groups: int = 5, **kwargs: object) -> None:
         """
         Args:
             epoch (int): maximum number of iterations, default = 10000
             pop_size (int): number of population size, default = 100
             explore_ratio (float): ratio to control exploration, default = 0.4
+            n_groups (int): number of groups for group-stage competition, default = 5
         """
         super().__init__(**kwargs)
         self.epoch = self.validator.check_int("epoch", epoch, [1, 100000])
-        self.pop_size = self.validator.check_int("pop_size", pop_size, [5, 10000])
+        self.pop_size = self.validator.check_int("pop_size", pop_size, [10, 10000])
         self.explore_ratio = self.validator.check_float("explore_ratio", explore_ratio, [0.0, 1.0])
-        self.set_parameters(["epoch", "pop_size", "explore_ratio"])
+        self.n_groups = self.validator.check_int("n_groups", n_groups, [5, 100])
+        self.set_parameters(["epoch", "pop_size", "explore_ratio", "n_groups"])
         self.sort_flag = False
+
+    def initialize_variables(self):
+        """
+        Initialize any variables needed for the algorithm.
+        """
+        self.explore_epoch = int(self.epoch * self.explore_ratio)
+
+    def before_main_loop(self):
+        """
+        Initialize variables before the main loop starts.
+        """
+        self.group_stage_competition()
+
+    def get_coefficients(self, a: float) -> tuple:
+        """
+        Generate coefficients A and C for position update equations.
+
+        Args:
+            a (float): Coefficient that decreases over epochs
+
+        Returns:
+            tuple: Coefficients A, C
+        """
+        A = a * (2 * self.generator.random(self.problem.n_dims) - 1)
+        C = 2 * self.generator.random(self.problem.n_dims)
+        return A, C
+
+    def group_stage_competition(self):
+        """
+        Group-stage competition mechanism:
+        1. Divide population into 6 subgroups
+        2. Select best wolf from each subgroup as delta candidates
+        3. Set best overall as alpha
+        4. Set delta candidate farthest from alpha as beta
+        """
+        # Divide population into n_groups
+        group_size = self.pop_size // self.n_groups
+        self.delta_candidates = []
+
+        for idx in range(self.n_groups):
+            start_idx = idx * group_size
+            if idx == self.n_groups - 1:  # Last group takes remaining wolves
+                end_idx = self.pop_size
+            else:
+                end_idx = (idx + 1) * group_size
+
+            # Get group members
+            group_population = self.pop[start_idx:end_idx]
+            # Find best wolf in group
+            group_sorted = self.get_sorted_population(group_population, minmax=self.problem.minmax)
+            self.delta_candidates.append(group_sorted[0].copy())
+
+        # Set alpha wolf (best among all delta candidates)
+        _, list_best, _ = self.get_special_agents(self.delta_candidates, n_best=1, minmax=self.problem.minmax)
+        self.alpha = list_best[0].copy()
+
+        # Set beta wolf (delta candidate farthest from alpha)
+        delta_pos = np.array([agent.solution for agent in self.delta_candidates])
+        distances = np.linalg.norm(delta_pos - self.alpha.solution, axis=1)
+        beta_idx = np.argmax(distances)
+        self.beta = self.delta_candidates[beta_idx].copy()
 
     def evolve(self, epoch):
         """
@@ -513,19 +576,30 @@ class DS_GWO(Optimizer):
         """
         # linearly decreased from 2 to 0
         a = 2 - 2. * epoch / self.epoch
-        _, list_best, _ = self.get_special_agents(self.pop, n_best=3, minmax=self.problem.minmax)
         pop_new = []
         for idx in range(0, self.pop_size):
-            A1 = a * (2 * self.generator.random(self.problem.n_dims) - 1)
-            A2 = a * (2 * self.generator.random(self.problem.n_dims) - 1)
-            A3 = a * (2 * self.generator.random(self.problem.n_dims) - 1)
-            C1 = 2 * self.generator.random(self.problem.n_dims)
-            C2 = 2 * self.generator.random(self.problem.n_dims)
-            C3 = 2 * self.generator.random(self.problem.n_dims)
-            X1 = list_best[0].solution - A1 * np.abs(C1 * list_best[0].solution - self.pop[idx].solution)
-            X2 = list_best[1].solution - A2 * np.abs(C2 * list_best[1].solution - self.pop[idx].solution)
-            X3 = list_best[2].solution - A3 * np.abs(C3 * list_best[2].solution - self.pop[idx].solution)
-            pos_new = (X1 + X2 + X3) / 3.0
+            if epoch < self.explore_epoch:
+                # Exploration phase: use alpha and beta wolves
+                # Exploration phase: Update position using two randomly selected delta candidates
+                selected_idxs = self.generator.choice(len(self.delta_candidates), 2, replace=False)
+                delta1 = self.delta_candidates[selected_idxs[0]]
+                delta2 = self.delta_candidates[selected_idxs[1]]
+                A1, C1 = self.get_coefficients(a)
+                A2, C2 = self.get_coefficients(a)
+                X1 = delta1.solution - A1 * np.abs(C1 * delta1.solution - self.pop[idx].solution)
+                X2 = delta2.solution - A2 * np.abs(C2 * delta2.solution - self.pop[idx].solution)
+                pos_new = (X1 + X2) / 2.0
+            else:
+                # Exploitation phase: use classic GWO equations with alpha and beta wolves
+                delta_sorted = self.get_sorted_population(self.delta_candidates, minmax=self.problem.minmax)
+                delta = delta_sorted[2] if len(delta_sorted) >=3 else delta_sorted[-1]
+                A1, C1 = self.get_coefficients(a)
+                A2, C2 = self.get_coefficients(a)
+                A3, C3 = self.get_coefficients(a)
+                X1 = self.alpha.solution - A1 * np.abs(C1 * self.alpha.solution - self.pop[idx].solution)
+                X2 = self.beta.solution - A2 * np.abs(C2 * self.beta.solution - self.pop[idx].solution)
+                X3 = delta.solution - A3 * np.abs(C3 * delta.solution - self.pop[idx].solution)
+                pos_new = (X1 + X2 + X3) / 3.0
             pos_new = self.correct_solution(pos_new)
             agent = self.generate_empty_agent(pos_new)
             pop_new.append(agent)
@@ -536,3 +610,5 @@ class DS_GWO(Optimizer):
             pop_new = self.update_target_for_population(pop_new)
             self.pop = self.greedy_selection_population(self.pop, pop_new, self.problem.minmax)
 
+        # Update leading wolves using group-stage competition
+        self.group_stage_competition()
