@@ -842,6 +842,7 @@ class ER_GWO(Optimizer):
 
     Notes:
         + Slow convergence speed due to the (miu_factor)^(iteration) ==> Big number
+        + Three more parameters than original GWO, increase the complexity of the algorithm.
 
     Links:
         1. https://doi.org/10.1007/s00500-019-03939-y
@@ -934,6 +935,10 @@ class ER_GWO(Optimizer):
 class CG_GWO(Optimizer):
     """
     The original version of: Cauchy‑Gaussian mutation and improved search strategy GWO (CG‑GWO)
+
+    Notes:
+        + This algorithm can't be parallelized because of the 'single' update mode.
+        + Meaning that the updating of the pack is based on order and sequence of the wolves.
 
     Links:
         1. https://doi.org/10.1038/s41598-022-23713-9
