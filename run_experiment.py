@@ -17,12 +17,12 @@ def run_experiment(list_funcs, get_func, dict_optimizer_classes, n_trials,
     # Helper function to execute a single trial for a model
     def run_trial(idx_trial, func, model_name, model_class):
         term_dict = {
-            "max_fe": 100  # number of function evaluation
+            "max_fe": 60000  # number of function evaluation
         }
         prob = get_func(func)
         model = model_class(epoch=epoch, pop_size=pop_size, name=model_name)
         g_best = model.solve(prob, termination=term_dict)
-        print(f"Solution: {g_best.solution}, Fitness: {g_best.target.fitness}")
+        print(f"{model}, Trial: {idx_trial}, Fitness: {g_best.target.fitness}")
 
         # Collect best results (Average, Best, SD)
         result_fit = {
@@ -102,13 +102,13 @@ def get_func_2017(fname="f1", ndim=30):
         "obj_func": fx.evaluate,
         "bounds": FloatVar(lb=fx.lb, ub=fx.ub),
         "minmax": "min",
-        "name": fname
+        "name": fname,
+        "log_to": None,
     }
     return problem
 
 if __name__ == "__main__":
     # List of functions for CEC 2017 competition
-
     # list_funcs_2017 = ["F1", "F2"]
     list_funcs_2017 = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "F13", "F14", "F15",
                       "F16", "F17", "F18", "F19", "F20", "F21", "F22", "F23", "F24", "F25", "F26", "F27", "F28", "F29"]
@@ -135,10 +135,10 @@ if __name__ == "__main__":
     PRINT_RESULT = False      # To save resource and for faster computation in colab, please set it to False, you don't need to see it print too much information
     PATH_SAVE_2017 = "cec2017"
 
-    EPOCH = 10
-    POP_SIZE = 20
-    N_TRIALS = 2
+    EPOCH = 5000
+    POP_SIZE = 30
+    N_TRIALS = 30
 
     run_experiment(list_funcs_2017, get_func_2017, dict_optimizer_classes, N_TRIALS, EPOCH, POP_SIZE,
                    save_file=SAVE_TO_FILE, path_save=PATH_SAVE_2017, verbose=PRINT_RESULT,
-                   n_workers=4)
+                   n_workers=6)

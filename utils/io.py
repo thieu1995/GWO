@@ -122,7 +122,12 @@ def draw_average_convergence_curve(models, fit_results, func_name, fig_size=(10,
                                    save_file=False, path_save="cec", verbose=True):
     plt.figure(figsize=fig_size)
     for idx_model, model in enumerate(models):
-        avg_fitness = np.mean(fit_results[model], axis=0)
+        model_curves = fit_results[model]
+        # Kiểm tra chiều dài các run
+        min_len = min([len(c) for c in model_curves])
+        # Cắt ngắn tất cả các run về min_len
+        trimmed = [run[:min_len] for run in model_curves]
+        avg_fitness = np.mean(trimmed, axis=0)
         plt.plot(avg_fitness, label=model)
     plt.title(f'Average convergence curve of compared algorithms for {func_name}')
     plt.xlabel('Iterations')
